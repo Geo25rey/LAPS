@@ -1,3 +1,1 @@
-- A more elegant way to check if grammar rules start with the same token
-- An optional priority system for grammar rules (New annotation in user code)
 - Add generate release compile configuration so parameter names are not saved in LAPS.jar
