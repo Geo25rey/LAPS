@@ -231,7 +231,8 @@ public class Main {
 			printStackTrace(t);
 		} catch (IOException ioe) {
 			System.err.println("\nI/O Error: " + ioe.getMessage());
-			ioe.printStackTrace();
+			if (r.debugEnabled())
+				ioe.printStackTrace();
 			result = -2;
 		} catch (Exception e) {
 			System.err.println();
@@ -252,8 +253,9 @@ public class Main {
 		System.err.println();
 		System.err.println(throwable);
 		for (StackTraceElement element : elements)
-			if (nativeConstructorPattern.matcher(element.toString())
-										.matches())
+			if (!r.debugEnabled() &&
+					nativeConstructorPattern.matcher(element.toString())
+											.matches())
 				break;
 			else
 				System.err.println("    at " + element);
