@@ -177,7 +177,7 @@ public class Main {
 	/**
 	 * Saves the language if {@link Main#save} is set to true
 	 *
-	 * @throws IOException
+	 * @throws IOException when there's an error saving to the specified file
 	 */
 	private static void saveIfSet() throws IOException {
 		if (save) {
@@ -247,11 +247,11 @@ public class Main {
 
 	private static void printStackTrace(Throwable throwable) {
 		StackTraceElement[] elements = throwable.getStackTrace();
-		Pattern nativeConstructorPattern = Pattern.compile("java\\.base\\/jdk" +
+		Pattern nativeConstructorPattern = Pattern.compile("java\\.base/jdk" +
 				"\\.internal\\.reflect\\.Native(Constructor|Method)AccessorImpl\\." +
 				"(newInstance|invoke)0\\(Native Method\\)");
 		System.err.println();
-		System.err.println(throwable);
+		System.err.println(throwable.toString());
 		for (StackTraceElement element : elements)
 			if (!r.debugEnabled() &&
 					nativeConstructorPattern.matcher(element.toString())
