@@ -247,8 +247,8 @@ public class Main {
 	private static void printStackTrace(Throwable throwable) {
 		StackTraceElement[] elements = throwable.getStackTrace();
 		Pattern nativeConstructorPattern = Pattern.compile("java\\.base\\/jdk" +
-				"\\.internal\\.reflect\\.NativeConstructorAccessorImpl\\." +
-				"newInstance0\\(Native Method\\)");
+				"\\.internal\\.reflect\\.Native(Constructor|Method)AccessorImpl\\." +
+				"(newInstance|invoke)0\\(Native Method\\)");
 		System.err.println();
 		System.err.println(throwable);
 		for (StackTraceElement element : elements)

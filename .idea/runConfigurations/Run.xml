@@ -2,8 +2,7 @@
   <configuration default="false" name="Run" type="Application" factoryName="Application" singleton="false">
     <option name="MAIN_CLASS_NAME" value="edu.rit.gec8773.laps.Main" />
     <module name="Example Languages" />
-    <option name="PROGRAM_PARAMETERS" value="-l -b" />
-    <option name="REDIRECT_INPUT" value="true" />
+    <option name="PROGRAM_PARAMETERS" value="-c intCalculator.Calculator -b" />
     <option name="INPUT_FILE" value="$PROJECT_DIR$/examples/intCalculator/test1.int" />
     <option name="VM_PARAMETERS" value="-cp &quot;C:\Users\gcasp\IdeaProjects\LAPS\out\production\LAPS\LAPS.jar;C:\Users\gcasp\IdeaProjects\LAPS\out\production\Example Languages&quot;" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/out/production/Example Languages" />
