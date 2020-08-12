@@ -194,10 +194,10 @@ public class Main {
 	 *
 	 * @param args the commandline arguments
 	 * @see Main#usage()
-	 * @throws Throwable when there is an uncaught exception in user code
+	 * @throws IOException when there is an error closing the token scanner
 	 * @see TopDownParser
 	 */
-	public static void main(String[] args) throws Throwable {
+	public static void main(String[] args) throws IOException {
 		int result = 0;
 		try {
 			r = Resources.instance;
