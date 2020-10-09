@@ -5,66 +5,65 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
 public class CompileTest {
     @Test
-    public void compileNameTest() throws ClassNameNotFoundException, ClassNotFoundException {
+    public void compileNameTest() throws ClassNotFoundException {
         String source = "package com.test;" +
                 "public class Test {}";
-        Class<?> cls = Compile.compile(null, source);
-        assertEquals(cls.getName(), "com.test.Test");
+        List<Class<?>> cls = Compile.compileSources(source);
+        assertEquals(cls.get(0).getName(), "com.test.Test");
     }
 
     @Test
-    public void compileInstanceTest() throws ClassNameNotFoundException, ClassNotFoundException,
+    public void compileInstanceTest() throws ClassNotFoundException,
             IllegalAccessException, InstantiationException {
         String source = "package com.test;" +
                 "public class Test {}";
-        Class<?> cls = Compile.compile(null, source);
-        Object obj = cls.newInstance();
-        assertEquals(obj.getClass(), cls);
+        List<Class<?>> cls = Compile.compileSources(source);
+        @SuppressWarnings("deprecation") Object obj = cls.get(0).newInstance();
+        assertEquals(obj.getClass(), cls.get(0));
     }
 
     @Test
     public void compileNoClassNameTest() {
         String source = "package com.test;";
-        assertThrows(ClassNameNotFoundException.class, () -> Compile.compile(null, source));
+        assertThrows(ClassNameNotFoundException.class, () -> Compile.compileSources(source));
     }
 
     @Test
-    public void compileDefaultPackageTest() throws ClassNameNotFoundException, ClassNotFoundException {
+    public void compileDefaultPackageTest() throws ClassNotFoundException {
         String source = "public class Test {}";
-        Class<?> cls = Compile.compile(null, source);
-        assertNotNull(cls);
+        List<Class<?>> cls = Compile.compileSources(source);
+        assertFalse(cls.isEmpty());
     }
 
     @Test
-    public void compileCallerPackageTest() throws ClassNameNotFoundException, ClassNotFoundException {
+    public void compileCallerPackageTest() throws ClassNotFoundException {
         String source = "package " + getClass().getPackageName() + ";"
                 + "public class Test {}";
-        Class<?> cls = Compile.compile(null, source);
-        assertNotNull(cls);
+        List<Class<?>> cls = Compile.compileSources(source);
+        assertFalse(cls.isEmpty());
     }
 
     @Test
-    public void compileFileTest() throws ClassNameNotFoundException, ClassNotFoundException, IOException {
+    public void compileFileTest() throws ClassNotFoundException {
         // Relative directories start in the Project Directory
         var files = List.of(new File ("examples/src/java/numlist/Numbers.java"),
                                       new File("examples/src/java/numlist/NumList.java"));
-        List<Class<?>> cls = Compile.compile(files);
+        List<Class<?>> cls = Compile.compileFiles(files);
         assertNotNull(cls);
         assertEquals(cls.size(), 2);
     }
 
     @Test
-    public void compileWithErrorsTest() throws ClassNameNotFoundException, ClassNotFoundException {
+    public void compileWithErrorsTest() throws ClassNotFoundException {
         String source = "class Test {" +
                 "Unknown;" +
                 "}";
-        Class<?> cls = Compile.compile(null, source);
-        assertNull(cls);
+        List<Class<?>> cls = Compile.compileSources(source);
+        assertTrue(cls.isEmpty());
     }
 }

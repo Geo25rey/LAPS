@@ -6,11 +6,7 @@ import javax.tools.*;
 import java.io.*;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -23,7 +19,7 @@ import static java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE;
  */
 public class Compile {
 
-    static String getClassName(String source) throws ClassNameNotFoundException {
+    private static String getClassName(String source) throws ClassNameNotFoundException {
         Matcher matcher = Pattern.compile(".*package\\s+(\\w+\\.)*\\w+\\s*;").matcher(source);
         String _package = null;
         while (_package == null && !matcher.hitEnd()) {
@@ -35,14 +31,14 @@ public class Compile {
                                .replaceFirst("\\s*;","");
 
         String beginPattern = ".*(public\\s+)?class\\s+";
-        String endPattern = "\\s*(\\<[\\w\\,]+\\>\\s*)?(\\s+((implements\\s+[\\w\\<\\>]+\\s*(\\,[\\w\\<\\>]+)*)|(extends\\s+[\\w\\<\\>]+\\s*(\\,[\\w\\<\\>]+)*))\\s*)?\\{";
+        String endPattern = "\\s*(<[\\w,]+>\\s*)?(\\s+((implements\\s+[\\w<>]+\\s*(,[\\w<>]+)*)|(extends\\s+[\\w<>]+\\s*(,[\\w<>]+)*))\\s*)?\\{";
         matcher = Pattern.compile(beginPattern + "\\w+" + endPattern).matcher(source);
         String className = null;
         while (className == null && !matcher.hitEnd()) {
             if (matcher.find())
                 className = matcher.group();
         }
-        // TODO add more acceptable class name patterns
+
         if (className == null)
             throw new ClassNameNotFoundException();
         className = className.replaceFirst(beginPattern, "")
@@ -51,19 +47,16 @@ public class Compile {
         return _package != null ? _package + "." + className : className;
     }
 
-    public static Class<?> compile(File file) throws IOException,
-            ClassNameNotFoundException, ClassNotFoundException {
-        try (FileInputStream inputStream = new FileInputStream(file)) {
-            return compile(null, new String(inputStream.readAllBytes()));
-        }
+    public static List<Class<?>> compileFiles(File... files) throws ClassNotFoundException {
+        return compileFiles(Arrays.asList(files));
     }
 
-    public static List<Class<?>> compile(List<File> files) throws ClassNotFoundException {
-        List<String> classNames = files.stream()
-                                       .map(exceptWrap(FileInputStream::new))
-                                       .map(exceptWrap(FileInputStream::readAllBytes))
-                                       .map(String::new)
-                                       .map(exceptWrap(Compile::getClassName))
+    public static List<Class<?>> compileFiles(List<File> files) throws ClassNotFoundException {
+        List<String> classNames = files.parallelStream()
+                                       .map(exceptWrap((CheckedFunction<File, FileInputStream>)FileInputStream::new)
+                                       .andThen(exceptWrap(FileInputStream::readAllBytes))
+                                       .andThen(String::new)
+                                       .andThen(exceptWrap(Compile::getClassName)))
                                        .collect(Collectors.toList());
         List<SimpleJavaFileObject> javaFileObjects = new ArrayList<>();
         for (var i = 0; i < files.size(); ++i) {
@@ -73,47 +66,51 @@ public class Compile {
                             .andThen(String::new)
                             .apply(files.get(i))));
         }
-        Lookup lookup = MethodHandles.lookup();
-        return compile0(classNames, javaFileObjects, lookup);
+        return compile(classNames, javaFileObjects);
     }
 
-    public static Class<?> compile(String className, String content)
-            throws ClassNameNotFoundException, ClassNotFoundException {
-        assert content != null;
-        if (className == null)
-            className = getClassName(content);
-        Lookup lookup = MethodHandles.lookup();
+    public static List<Class<?>> compileSources(String... contents) throws ClassNotFoundException {
+        return compileSources(Arrays.asList(contents));
+    }
 
-        // If we have already compiled our class, simply load it
-        try {
-            return lookup.lookupClass()
-                    .getClassLoader()
-                    .loadClass(className);
+    public static List<Class<?>> compileSources(List<String> contents) throws ClassNotFoundException {
+        var classNames = contents.parallelStream()
+                .map(exceptWrap(Compile::getClassName))
+                .collect(Collectors.toList());
+        List<SimpleJavaFileObject> contentList = new ArrayList<>();
+        for (var i = 0; i < classNames.size(); ++i) {
+            contentList.add(new CharSequenceJavaFileObject(classNames.get(i), contents.get(i)));
         }
-
-        // Otherwise, let's try to compile it
-        catch (ClassNotFoundException ignore) {
-            return compile0(className, content, lookup);
-        }
+        return compile(classNames, contentList);
     }
 
-    static Class<?> compile0(String className, String content, Lookup lookup) throws ClassNotFoundException {
-        List<SimpleJavaFileObject> files = new ArrayList<>();
-        files.add(new CharSequenceJavaFileObject(
-                className, content));
-        var classNames = List.of(className);
-        var result = compile0(classNames, files, lookup);
-        return result == null ? null : result.get(0);
-    }
-
-    static List<Class<?>> compile0(List<String> classNames, List<SimpleJavaFileObject> files, Lookup lookup)
+    private static List<Class<?>> compile(List<String> classNames, List<SimpleJavaFileObject> files)
             throws ClassNotFoundException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        Lookup lookup = MethodHandles.lookup();
+
+        List<Class<?>> result = new ArrayList<>();
+
+        for (var i = 0; i < classNames.size(); ++i) {
+            // If we have already compiled our class, simply load it
+            try {
+                result.add(lookup.lookupClass()
+                        .getClassLoader()
+                        .loadClass(classNames.get(i)));
+                classNames.remove(i);
+                files.remove(i);
+            } // Otherwise, let's try to compile it
+            catch (ClassNotFoundException ignore) {
+
+            }
+        }
+
+        if (files.isEmpty())
+            return result;
 
         var diagnosticCollector = new DiagnosticCollector<>();
         ClassFileManager manager = new ClassFileManager(
                 compiler.getStandardFileManager(diagnosticCollector, null, null));
-
 
         compiler.getTask(null, manager, diagnosticCollector, null, null, files)
                 .call();
@@ -125,9 +122,7 @@ public class Compile {
         }
 
         if (hasErrors)
-            return null;
-
-        List<Class<?>> result = new ArrayList<>();
+            return result;
 
         // This method is called by client code from two levels
         // up the current stack frame. We need a private-access
@@ -151,7 +146,7 @@ public class Compile {
                 try {
                     result.add(MethodHandles
                             .privateLookupIn(caller, lookup)
-                            .defineClass(manager.objs.get(className).getBytes()));
+                            .defineClass(manager.get(className).getBytes()));
                 } catch (IllegalAccessException ignore) {
 
                 }
@@ -163,9 +158,8 @@ public class Compile {
             else {
                 result.add(new ClassLoader() {
                     @Override
-                    protected Class<?> findClass(String name)
-                            throws ClassNotFoundException {
-                        byte[] b = manager.objs.get(className).getBytes();
+                    protected Class<?> findClass(String name) {
+                        byte[] b = manager.get(className).getBytes();
                         int len = b.length;
                         return defineClass(className, b, 0, len);
                     }
@@ -174,76 +168,5 @@ public class Compile {
         }
 
         return result;
-    }
-
-    // These are some utility classes needed for the JavaCompiler
-    // ----------------------------------------------------------
-
-    static final class JavaFileObject
-            extends SimpleJavaFileObject {
-        final ByteArrayOutputStream os =
-                new ByteArrayOutputStream();
-
-        JavaFileObject(String name, JavaFileObject.Kind kind) {
-            super(URI.create(
-                    "string:///"
-                            + name.replace('.', '/')
-                            + kind.extension),
-                    kind);
-        }
-
-        byte[] getBytes() {
-            return os.toByteArray();
-        }
-
-        @Override
-        public OutputStream openOutputStream() {
-            return os;
-        }
-    }
-
-    static final class ClassFileManager
-            extends ForwardingJavaFileManager<StandardJavaFileManager> {
-        Map<String, JavaFileObject> objs;
-
-        ClassFileManager(StandardJavaFileManager m) {
-            super(m);
-            objs = new HashMap<>();
-        }
-
-        @Override
-        public JavaFileObject getJavaFileForOutput(
-                JavaFileManager.Location location,
-                String className,
-                JavaFileObject.Kind kind,
-                FileObject sibling
-        ) {
-            objs.put(className, new JavaFileObject(className, kind));
-            return objs.get(className);
-        }
-    }
-
-    static final class CharSequenceJavaFileObject
-            extends SimpleJavaFileObject {
-        final CharSequence content;
-
-        public CharSequenceJavaFileObject(
-                String className,
-                CharSequence content
-        ) {
-            super(URI.create(
-                    "string:///"
-                            + className.replace('.', '/')
-                            + JavaFileObject.Kind.SOURCE.extension),
-                    JavaFileObject.Kind.SOURCE);
-            this.content = content;
-        }
-
-        @Override
-        public CharSequence getCharContent(
-                boolean ignoreEncodingErrors
-        ) {
-            return content;
-        }
     }
 }
