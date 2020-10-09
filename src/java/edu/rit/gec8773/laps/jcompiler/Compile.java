@@ -112,7 +112,9 @@ public class Compile {
         ClassFileManager manager = new ClassFileManager(
                 compiler.getStandardFileManager(diagnosticCollector, null, null));
 
-        compiler.getTask(null, manager, diagnosticCollector, null, null, files)
+        var compilationFlags = List.of("-parameters");
+
+        compiler.getTask(null, manager, diagnosticCollector, compilationFlags, null, files)
                 .call();
         var errors = diagnosticCollector.getDiagnostics();
         var hasErrors = false;
