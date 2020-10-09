@@ -3,7 +3,7 @@ package edu.rit.gec8773.laps.jcompiler;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -65,5 +65,20 @@ public class CompileTest {
                 "}";
         List<Class<?>> cls = Compile.compileSources(source);
         assertTrue(cls.isEmpty());
+    }
+
+    @Test
+    public void compileKeepsParameterNamesTest() throws ClassNotFoundException, NoSuchMethodException {
+        String source = "public class Test {" +
+                "public static void function(int parameterName) {}" +
+                "}";
+        List<Class<?>> cls = Compile.compileSources(source);
+        String name = Arrays.stream(cls.get(0)
+                                       .getMethod("function", Integer.TYPE)
+                                       .getParameters())
+                            .findFirst()
+                            .orElseThrow()
+                            .getName();
+        assertEquals("parameterName", name);
     }
 }
